@@ -1,0 +1,49 @@
+---
+title: "Projet Série Temporelle"
+output: html_notebook
+---
+SCHULTZ Martin - Master SISE - Université Lyon 2 <br>
+Janvier 2023
+
+```{r}
+library("readxl")
+```
+```{r}
+data = read_excel("Elec-train.xlsx")
+#data = read_excel("F:/MasterSISE/SerieTemporelle/Projet/Elec-train.xlsx")
+#data = read_excel("C:/Users/Maartin/Downloads/SerieTemporelle/Projet/Elec-train.xlsx")
+```
+
+```{r}
+#dataSeries<-ts(data$Timestamp,,start=c(1931,1),end=c(1972,6),freq=12)
+```
+
+```{r}
+
+
+x <- as.POSIXct(ts(data$Timestamp), format = "%Y-%m-%d %H:%M", tz = "UTC")
+y <- format(x, format = "%d-%m-%Y %H:%M")
+x
+```
+
+
+
+
+
+
+
+
+
+
+
+Vous devez rendre deux prévisions, avec et sans utilisation de la température extérieure, dans un fichier Excel intitulé
+
+VotreNom.xlsx, avec exactement deux colonnes et 96 lignes, contenant les prévisions pour le 17/02/2010 : la première
+colonne pour la prévision sans utilisation de la température, la seconde pour la prévision avec utilisation de la température.
+
+En plus de vos prévisions, vous devez également renvoyer un court rapport (intitulé VotreNom.pdf) expliquant la manière dont vous avez procédé et contenant les codes R.
+
+La notation prendra en compte :
+- la qualité de votre méthodologie (50%)
+- la qualité de votre prévision (30%)
+- la qualité de votre rapport et le respect des consignes de l'examen (20%)
