@@ -5,26 +5,52 @@ output: html_notebook
 SCHULTZ Martin - Master SISE - Université Lyon 2 <br>
 Janvier 2023
 
+
+
 ```{r}
 library("readxl")
+library(forecast)
+library(fpp2)
+library(ggplot2)
 ```
+
+
+
 ```{r}
 data = read_excel("Elec-train.xlsx")
 #data = read_excel("F:/MasterSISE/SerieTemporelle/Projet/Elec-train.xlsx")
 #data = read_excel("C:/Users/Maartin/Downloads/SerieTemporelle/Projet/Elec-train.xlsx")
 ```
 
+
+
 ```{r}
-#dataSeries<-ts(data$Timestamp,,start=c(1931,1),end=c(1972,6),freq=12)
+elec<-ts(data[1:4507,2],start=c(1,5),freq=4)
+elecTemperature=ts(data[1:4507,2:3],start=c(1,5),freq=4)
 ```
 
 ```{r}
-
-
-x <- as.POSIXct(ts(data$Timestamp), format = "%Y-%m-%d %H:%M", tz = "UTC")
-y <- format(x, format = "%d-%m-%Y %H:%M")
-x
+elec_train = window(elec, start=c(1,5), end=c(46,96))
+elec_test = window(elec, start=c(47,1), end=c(47,96))
 ```
+
+
+```{r}
+plot(elecTemperature)
+plot(elec)
+```
+```{r}
+autoplot(elecTemperature)
+```
+```{r}
+fitAuto=auto.arima(elec,lambda = "auto")
+checkresiduals(fitAuto)
+```
+```{r}
+fit=Arima(elec, order=c(4,0,4), seasonal=c(0,1,0))
+checkresiduals(fit)
+```
+
 
 
 
