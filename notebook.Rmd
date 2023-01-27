@@ -25,12 +25,13 @@ data = read_excel("Elec-train.xlsx")
 
 
 ```{r}
-elec<-ts(data[1:4507,2],start=c(1,5),freq=4)
+elec<-ts(data[1:4507,2],start=c(1,1),freq=4)
 elecTemperature=ts(data[1:4507,2:3],start=c(1,5),freq=4)
+elec
 ```
 
 ```{r}
-elec_train = window(elec, start=c(1,5), end=c(46,96))
+elec_train = window(elec, start=c(1,1), end=c(46,96))
 elec_test = window(elec, start=c(47,1), end=c(47,96))
 ```
 
@@ -39,16 +40,25 @@ elec_test = window(elec, start=c(47,1), end=c(47,96))
 plot(elecTemperature)
 plot(elec)
 ```
+
 ```{r}
 autoplot(elecTemperature)
 ```
+
 ```{r}
 fitAuto=auto.arima(elec,lambda = "auto")
 checkresiduals(fitAuto)
 ```
+
 ```{r}
 fit=Arima(elec, order=c(4,0,4), seasonal=c(0,1,0))
 checkresiduals(fit)
+```
+
+```{r}
+fit900=Arima(elec, order=c(9,0,0), seasonal=c(0,1,3))
+checkresiduals(fit900)
+
 ```
 
 
