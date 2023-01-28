@@ -6,7 +6,7 @@ SCHULTZ Martin - Master SISE - Université Lyon 2 <br>
 Janvier 2023
 
 
-Utilisatiuon des librairies
+Utilisation des librairies nécessaires
 ```{r}
 library("readxl")
 library("forecast")
@@ -16,15 +16,15 @@ library("dplyr")
 ```
 
 
-Importation des données
+## Importation des données
+(Modification de la première cellule via excel pour avoir le boin format de données)
 ```{r}
 data = read_excel("Elec-train.xlsx")
-#data = read_excel("F:/MasterSISE/SerieTemporelle/Projet/Elec-train.xlsx")
-#data = read_excel("C:/Users/Maartin/Downloads/SerieTemporelle/Projet/Elec-train.xlsx")
 ```
 
 
-La fréquence est de 96 car les donnée sont ont été mesuré toutes les 15min
+La fréquence est de 96 car les données ont été mesuré toutes les 15min. 
+1jour = 96 * 15min
 ```{r}
 data=mutate(data, Timestamp = as.POSIXct(Timestamp,format = "%m/%d/%Y %H:%M"))
 elec<-ts(data[1:4507,2],start=c(1,1),freq=96)
@@ -38,16 +38,31 @@ elecTemperature=ts(data[1:4507,2:3],start=c(1,5),freq=96)
 plot(elecTemperature)
 plot(elec)
 ```
-Il semble y avoir une saisonalité dans la consommation électrique,
-il ne semble pas qu'il existe une tendance, car la consommation électrique ne semble ni augmneter ni diminiuer.
+Il semble avoir une saisonalité dans la consommation électrique, 
+Mais il ne semble pas qu'il existe une tendance, car la consommation électrique ne semble ni augmenter ni diminiuer.
 
 
-Division des des donnes en echantillons d'appre,tissage et de test. L'échantillon de test représente le dernier jour de consommation.
+Division des données en échantillons d'apprentissage et de test.
+L'échantillon de test représente le dernier jour de consommation.
 ```{r}
 elec_train = window(elec, start=c(1,6), end=c(45,96))
 elec_test = window(elec, start=c(46,1), end=c(46,96))
-```
+elec_prev = window(elec, start=c(1,6), end=c(47,96))
 
+elecTemperature_train = window(elecTemperature, start=c(1,6), end=c(45,96))
+elecTemperature_test = window(elecTemperature, start=c(46,1), end=c(46,96))
+elecTemperature_prev = window(elecTemperature, start=c(1,6), end=c(47,96))
+```
+On commence la série à partir de 6 car la première valeur à été prise à 1h15. 
+
+
+
+
+
+
+
+
+## SARIMA
 
 ```{r}
 fitAuto=auto.arima(elec_train,lambda = "auto")
@@ -55,7 +70,10 @@ summary(fitAuto)
 ```
 ```{r}
 prev= forecast(fitAuto)
-cat("RMSE", sqrt(mean(elec_test-prev$mean)^2),'\n')
+cat("RMSE", sqrt(mean(elec_test-prev$mean)^2))
+```
+```{r}
+autoplot(prev) + autolayer(elec_test, series="True data")+ autolayer(prev$mean, series="Auto Sarima Prediction")
 ```
 
 
@@ -74,8 +92,13 @@ tmp=diff(elec_train,lag=96)
 autoplot(tmp)
 ggseasonplot(tmp)
 ```
+
+
 ```{r}
-ggtsdisplay(diff(elec_train,lag = 96))
+pacf(fitAuto$residuals)
+```
+```{r}
+checkresiduals(fitAuto)
 
 ```
 
@@ -86,13 +109,24 @@ ggtsdisplay(diff(elec_train,lag = 96))
 
 
 
-NEURAL NETWORK
+
+
+
+
+
+
+
+
+
+
+
+## NEURAL NETWORK
 
 ```{r}
 NNfit=nnetar(elec_train)
 summary(NNfit)
 prevNNfit= forecast(NNfit)
-cat("RMSE", sqrt(mean(elec_test-prevNNfit$mean)^2),'\n')
+cat("RMSE", sqrt(mean(elec_test-prevNNfit$mean)^2))
 ```
 
 
@@ -108,14 +142,14 @@ cat("RMSE", sqrt(mean(elec_test-prevNNfit$mean)^2),'\n')
 fit404=Arima(elec, order=c(4,0,4), seasonal=c(0,1,0))
 summary(fit404)
 prevfit404= forecast(fit404)
-cat("RMSE", sqrt(mean(elec_test-prevfit404$mean)^2),'\n')
+cat("RMSE", sqrt(mean(elec_test-prevfit404$mean)^2))
 ```
 
 ```{r}
 fit900=Arima(elec_train, order=c(9,0,0), seasonal=c(0,1,3))
 summary(fit900)
 prevfit900= forecast(fit900)
-cat("RMSE", sqrt(mean(elec_test-prevfit900$mean)^2),'\n')
+cat("RMSE", sqrt(mean(elec_test-prevfit900$mean)^2))
 
 ```
 
@@ -126,16 +160,18 @@ cat("RMSE", sqrt(mean(elec_test-prevfit900$mean)^2),'\n')
 
 
 
+## Holt-Winters
 
 
 ```{r}
 fitHW= HoltWinters(elec_train)
 summary(fitHW)
 prevfitHW= forecast(fitHW)
-cat("RMSE", sqrt(mean(elec_test-prevfitHW$mean)^2),'\n')
+cat("RMSE", sqrt(mean(elec_test-prevfitHW$mean)^2))
 ```
 
 
+## Prévisions
 
 
 
