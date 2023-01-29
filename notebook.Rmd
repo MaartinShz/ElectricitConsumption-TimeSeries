@@ -6,68 +6,160 @@ SCHULTZ Martin - Master SISE - Université Lyon 2 <br>
 Janvier 2023
 
 
-Utilisation des librairies nécessaires
+Utilisation des librairies nécessaires<br>
 ```{r}
 library("readxl")
 library("forecast")
 library("fpp2")
 library("ggplot2")
 library("dplyr")
+library("xlsx")
 ```
 
 
 ## Importation des données
-(Modification de la première cellule via excel pour avoir le boin format de données)
+
 ```{r}
 data = read_excel("Elec-train.xlsx")
+data[1,1] = "1/1/2010 1:15" # erreur de format dans le fichier source
 ```
 
 
-La fréquence est de 96 car les données ont été mesuré toutes les 15min. 
+La fréquence est de 96 car les données ont été mesuré toutes les 15min. <br>
 1jour = 96 * 15min
 ```{r}
 data=mutate(data, Timestamp = as.POSIXct(Timestamp,format = "%m/%d/%Y %H:%M"))
-elec<-ts(data[1:4507,2],start=c(1,1),freq=96)
-elecTemperature=ts(data[1:4507,2:3],start=c(1,5),freq=96)
-#print(elec)
+elec<- ts(data[,2], start = c(1,6), end = c(47,96),frequency = 96)
+elecTemperature=ts(data[,2:3], start = c(1,6), end = c(48,96),frequency = 96)
 ```
 
 
-
+## Analyse des donénes
 ```{r}
 plot(elecTemperature)
 plot(elec)
 ```
-Il semble avoir une saisonalité dans la consommation électrique, 
-Mais il ne semble pas qu'il existe une tendance, car la consommation électrique ne semble ni augmenter ni diminiuer.
+Il semble avoir une saisonnalité dans la consommation électrique, 
+Mais il ne semble pas qu'il existe une tendance, car la consommation électrique ne semble ni augmenter ni diminiuer.<br>
 
 
-Division des données en échantillons d'apprentissage et de test.
-L'échantillon de test représente le dernier jour de consommation.
+## Division des données en échantillons d'apprentissage et de test.
+L'échantillon de test représente le dernier jour de consommation.<br>
 ```{r}
-elec_train = window(elec, start=c(1,6), end=c(45,96))
-elec_test = window(elec, start=c(46,1), end=c(46,96))
-elec_prev = window(elec, start=c(1,6), end=c(47,96))
+elec_train = window(elec, start=c(1,6), end=c(46,96))
+elec_test = window(elec, start=c(47,1), end=c(47,96))
+elec_prev = window(elec, start=c(1,6))
 
-elecTemperature_train = window(elecTemperature, start=c(1,6), end=c(45,96))
-elecTemperature_test = window(elecTemperature, start=c(46,1), end=c(46,96))
-elecTemperature_prev = window(elecTemperature, start=c(1,6), end=c(47,96))
+elecTemperature_train = window(elecTemperature, start=c(1,6), end=c(46,96))
+elecTemperature_test = window(elecTemperature, start=c(47,1), end=c(47,96))
+elecTemperature_prev = window(elecTemperature, start=c(1,6))
 ```
-On commence la série à partir de 6 car la première valeur à été prise à 1h15. 
+On commence la série à partir de 6 car la première valeur à été prise à 1h15. (6ième quarts-heure de la journée) <br>
 
 
+# Sans Utilisation de la variable Temperature
 
+```{r}
+tmp=acf(elec_train,type="cor",plot = FALSE)
+plot(tmp)
+```
+Grâce à notre ACF, je suis sûr que la serie a une Saisonnalité, car la fonction décroit exponentiellement
 
+```{r}
+differenciation=diff(elec_train,lag=96)
+autoplot(differenciation)
+ggseasonplot(differenciation)
+```
 
+```{r}
+diffpacf=pacf(diff(elec_train),type="cor",plot = FALSE)
+plot(diffpacf)
+```
 
-
-
+```{r}
+diffacf=acf(diff(elec_train),type="cor",plot = FALSE)
+plot(diffacf)
+```
 ## SARIMA
 
+On va essayer d'utiliser les modèles auto-régressifs : <br>
+
+En consultant le PACF, on voit un pic sur le lag 2, On essaye le modèle suivant :
+```{r}
+fit200=Arima(elec_train, order=c(2,0,0), seasonal=c(0,1,1))#96
+summary(fit200)
+prevfit200= forecast(fit200)
+cat("RMSE", sqrt(mean(elec_test-prevfit200$mean)^2))SS
+```
+
+
+```{r}
+fit200 %>% residuals() %>% ggPacf()
+```
+On voit un pic sur le lag 3, on va essayer d'améliorer les performances de notre modèle :
+
+```{r}
+fit300=Arima(elec_train, order=c(3,0,0), seasonal=c(0,1,1))#96
+summary(fit300)
+prevfit300= forecast(fit300)
+cat("RMSE", sqrt(mean(elec_test-prevfit300$mean)^2))
+```
+
+
+
+
+```{r}
+fit300 %>% residuals() %>% ggAcf()
+```
+On voit un pic sur le ACF, sur le lag 3 :
+```{r}
+fit303=Arima(elec_train, order=c(3,0,3), seasonal=c(0,1,1))#96
+prevfit303 = forecast(fit303)
+cat("RMSE", sqrt(mean(elec_test-prevfit303$mean)^2))
+```
+```{r}
+checkresiduals(fit303)
+```
+
+
+
+
+```{r}
+fit303 %>% residuals() %>% ggAcf()
+```
+On voit un pic sur le lag 7, on va encore améliorer notre modèle :
+```{r}
+fit307=Arima(elec_train, order=c(3,0,7), seasonal=c(0,1,1))#96
+summary(fit307)
+prevfit307 = forecast(fit307)
+cat("RMSE", sqrt(mean(elec_test-prevfit307$mean)^2))
+```
+
+```{r}
+fit307 %>% residuals() %>% ggPacf()
+```
+
+```{r}
+fit307 %>% residuals() %>% ggAcf()
+```
+```{r}
+checkresiduals(fit307)
+```
+
+Il reste des corrections pour capturer toutes les informations elles nécessitent une trop grande puissance de calcul pour que l'on puisse continuer. <br>
+Cependant avec une p-value 0.0006805, les bruits blanc ne sont pas pris en compte. <br>
+
+
+
+
+### SARIMA Auto
+
+On va essayer de voir ce qu'on peut obtenir avec un SARIMA automatique :
 ```{r}
 fitAuto=auto.arima(elec_train,lambda = "auto")
 summary(fitAuto)
 ```
+
 ```{r}
 prev= forecast(fitAuto)
 cat("RMSE", sqrt(mean(elec_test-prev$mean)^2))
@@ -75,93 +167,25 @@ cat("RMSE", sqrt(mean(elec_test-prev$mean)^2))
 ```{r}
 autoplot(prev) + autolayer(elec_test, series="True data")+ autolayer(prev$mean, series="Auto Sarima Prediction")
 ```
-
-
-```{r}
-tmp=acf(elec_train,type="cor",plot = FALSE)
-plot(tmp)
-```
-
-```{r}
-tmp=pacf(elec_train,type="cor",plot = FALSE)
-plot(tmp)
-```
-
-```{r}
-tmp=diff(elec_train,lag=96)
-autoplot(tmp)
-ggseasonplot(tmp)
-```
-
-
-```{r}
-pacf(fitAuto$residuals)
-```
-```{r}
-checkresiduals(fitAuto)
-
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Les résulats de ce modèle sont inférieur à ce que l'on a trouvé auparavant
 
 
 
 ## NEURAL NETWORK
 
+On essaye de faire une prédiction avec un réseau de neurones
 ```{r}
 NNfit=nnetar(elec_train)
 summary(NNfit)
 prevNNfit= forecast(NNfit)
 cat("RMSE", sqrt(mean(elec_test-prevNNfit$mean)^2))
 ```
-
-
-
-
-
-
-
-
-
-
-```{r}
-fit404=Arima(elec, order=c(4,0,4), seasonal=c(0,1,0))
-summary(fit404)
-prevfit404= forecast(fit404)
-cat("RMSE", sqrt(mean(elec_test-prevfit404$mean)^2))
-```
-
-```{r}
-fit900=Arima(elec_train, order=c(9,0,0), seasonal=c(0,1,3))
-summary(fit900)
-prevfit900= forecast(fit900)
-cat("RMSE", sqrt(mean(elec_test-prevfit900$mean)^2))
-
-```
-
-
-
-
-
+Le résultat n'est pas assez performant, comparé aux RMSE du SARIMA
 
 
 
 ## Holt-Winters
-
+On essaye de faire une prédiction avec un Holt-Winters.
 
 ```{r}
 fitHW= HoltWinters(elec_train)
@@ -169,26 +193,147 @@ summary(fitHW)
 prevfitHW= forecast(fitHW)
 cat("RMSE", sqrt(mean(elec_test-prevfitHW$mean)^2))
 ```
+De même pour cette méthode, le résultat n'est pas assez performant
 
+
+## Choix Modèle
+Même si le modèle SARIMA(3,0,3)(0,1,1)[96] n'est pas le modèle qui a capté le plus d'informations. <br>
+C'est le modèle avec le RMSE le plus bas : 3.982057  <br>
+Son bruit balnc n'est pas pris en compte avec une p-value = 3.682e-09  <br>
+
+### Export des prédictions
+
+#### Pour la prévision sans l'utilisation de la température extérieure
+
+```{r}
+fit303F=Arima(elec_prev, order=c(3,0,3), seasonal=c(0,1,1))#96
+prevFinal = forecast(fit303F, h=96)
+```
+
+```{r}
+write.xlsx(as.data.frame(prevFinal$mean), "exportPower.xlsx")
+```
+
+
+# Utilisation de la variable Temperature
+
+On va d'abord essayer de voir si il y a correlation entre les variables Temperature et Power
+```{r}
+plot(elecTemperature_train[,1], y=elecTemperature_train[,2])
+```
+```{r}
+cor(elecTemperature_train)
+```
+Nous obtenons une valeur de 0.472 <br>
+Les variables ne semblent pas vraiment corrélées.
 
 ## Prévisions
+```{r}
+tmp=acf(elecTemperature_train[,1],type="cor",plot = FALSE)
+plot(tmp)
+```
+```{r}
+diffpacf=pacf(diff(elecTemperature_train[,1]),type="cor",plot = FALSE)
+plot(diffpacf)
+```
+On remarque à nouveau une saisonnalité et avec le PACF on a un pic du lag à 2
+
+```{r}
+fit200Temp=Arima(elecTemperature_train[,1], order=c(2,0,0), seasonal=c(0,1,1), xreg = elecTemperature_train[,2])#96
+summary(fit200Temp)
+prevfit200Temp= forecast(fit200Temp, xreg=elecTemperature_test[,2])
+cat("RMSE", sqrt(mean(elecTemperature_test[,1]-prevfit200Temp$mean)^2))
+```
+```{r}
+fit200Temp %>% residuals() %>% ggPacf()
+```
+Grâce au PACF, on voit un pic au lag 3, on va améliorer le modèle
+
+```{r}
+fit400Temp=Arima(elecTemperature_train[,1], order=c(4,0,0), seasonal=c(0,1,1), xreg = elecTemperature_train[,2])#96
+summary(fit400Temp)
+prevfit400Temp= forecast(fit400Temp, xreg=elecTemperature_test[,2])
+cat("RMSE", sqrt(mean(elecTemperature_test[,1]-prevfit400Temp$mean)^2))
+```
+
+```{r}
+fit400Temp %>% residuals() %>% ggPacf()
+```
+On observe toujours un pic sur le lag 4 on va essayer d'en prendre un autre pic ici avec le lag 7
+
+```{r}
+fit700Temp=Arima(elecTemperature_train[,1], order=c(7,0,0), seasonal=c(0,1,1), xreg = elecTemperature_train[,2])#96
+summary(fit700Temp)
+prevfit700Temp= forecast(fit700Temp, xreg=elecTemperature_test[,2])
+cat("RMSE", sqrt(mean(elecTemperature_test[,1]-prevfit700Temp$mean)^2))
+```
+```{r}
+fit700Temp %>% residuals() %>% ggPacf()
+```
+On observe un pic sur le lag 9 on va essayer d'améliorer le modèle
+
+```{r}
+fit900Temp=Arima(elecTemperature_train[,1], order=c(9,0,0), seasonal=c(0,1,1), xreg = elecTemperature_train[,2])#96
+summary(fit900Temp)
+prevfit900Temp= forecast(fit900Temp, xreg=elecTemperature_test[,2])
+cat("RMSE", sqrt(mean(elecTemperature_test[,1]-prevfit900Temp$mean)^2))
+```
+
+```{r}
+fit900Temp %>% residuals() %>% ggPacf()
+```
+On observe un pic sur le lag 8 on va essayer d'améliorer le modèle
+```{r}
+fit800Temp=Arima(elecTemperature_train[,1], order=c(8,0,0), seasonal=c(0,1,1), xreg = elecTemperature_train[,2])#96
+summary(fit800Temp)
+prevfit800Temp= forecast(fit800Temp, xreg=elecTemperature_test[,2])
+cat("RMSE", sqrt(mean(elecTemperature_test[,1]-prevfit800Temp$mean)^2))
+```
+
+```{r}
+fit800Temp %>% residuals() %>% ggPacf()
+```
+
+```{r}
+fit800Temp %>% residuals() %>% ggAcf()
+```
+On arrive plus à stabiliser les pic des lag, cela nécessite trop de performances. <br>
 
 
 
+## NEURAL NETWORK
+On essaye de faire une prédiction avec un réseau de neurones.
+
+```{r}
+NNfitTemp=nnetar(elecTemperature_train[,1], xreg = elecTemperature_train[,2])
+summary(NNfitTemp)
+prevNNfitTemp= forecast(NNfitTemp, xreg=elecTemperature_test[,2])
+cat("RMSE", sqrt(mean(elecTemperature_test[,1]-prevNNfitTemp$mean)^2))
+```
+```{r}
+checkresiduals(NNfitTemp)
+```
 
 
 
+Le résultat est très satisfesant comparé aux RMSE du SARIMA
+
+
+### Pour la prévision avec l'utilisation de la température extérieure
+Les prédictions semblent vraiment similaires avec ou sans la variable température, on a aperçu une petite différence de performances entre les modèles. <br>
+Le modèle utilisant un réseau de neurone s'est démarqué avec un RMSE bizarrement bas de 1.208937. <br>
+
+
+## Exportation des résultats
+
+```{r}
+fitFinaltemp = nnetar(elecTemperature_prev[1:4507,1], xreg = elecTemperature_prev[1:4507,2])
+prevFinalTemp= forecast(fitFinaltemp, xreg=elecTemperature_prev[4508:4603,2])
+write.xlsx(as.data.frame(prevFinalTemp$mean), "exportPowerTemp.xlsx")
+```
 
 
 
-Vous devez rendre deux prévisions, avec et sans utilisation de la température extérieure, dans un fichier Excel intitulé
-
-VotreNom.xlsx, avec exactement deux colonnes et 96 lignes, contenant les prévisions pour le 17/02/2010 : la première
-colonne pour la prévision sans utilisation de la température, la seconde pour la prévision avec utilisation de la température.
-
-En plus de vos prévisions, vous devez également renvoyer un court rapport (intitulé VotreNom.pdf) expliquant la manière dont vous avez procédé et contenant les codes R.
-
-La notation prendra en compte :
-- la qualité de votre méthodologie (50%)
-- la qualité de votre prévision (30%)
-- la qualité de votre rapport et le respect des consignes de l'examen (20%)
+A noter que dans le fichier prédiction : <br>
+La première colonne contient les prédictions SANS la variable température. <br>
+La deuxième colonne contient les prédictions AVEC la variable température. <br>
